@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtitle Creator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f5;
+            color: #ffffff;
+            background-color: #313131;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            justify-content: space-between;
+        }
+
+        .video-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            width: 40%; /* Fix size */
+        }
+
+        .subtitle-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 60%; /* Fix size */
+        }
+
+        video {
+            width: 100%;
+            max-width: 100%;
+            margin-bottom: 10px;
+            border: 3px solid #5a9;
+            border-radius: 8px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            margin-top: 10px;
+            border: 1px solid #5a9;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            background-color: #fff;
+            background-color: #5c5c5c;
+            color: white;
+        }
+
+        .controls {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            flex-wrap: wrap; /* Ensure wrapping */
+        }
+
+        .controls button,
+        .controls input {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            background-color: #5a9;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .controls button:hover {
+            background-color: #478c6c;
+        }
+
+        .subtitle-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .subtitle-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .subtitle-table th,
+        .subtitle-table td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .subtitle-table th {
+            background-color: #5a9;
+            color: white;
+        }
+
+        .download-btn {
+            background-color: #3a86ff;
+        }
+
+        .download-btn:hover {
+            background-color: #2f66cc;
+        }
+
+        .delete-btn {
+            padding: 5px 10px;
+            background-color: #e63946;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .delete-btn:hover {
+            background-color: #c52835;
+        }
+        .h1 {
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Subtitle Creator</h1>
+
+    <div class="container">
+        <div class="video-section">
+            <video id="videoPlayer" controls></video>
+
+            <div class="controls">
+                <input type="file" id="videoUploader" accept="video/*">
+                <input type="file" id="subtitleUploader" accept=".srt">
+                <button id="addSubtitle">Přidat titulky</button>
+                <button id="importToTable">Importovat do tabulky</button>
+                <button id="downloadSRT" class="download-btn">Stáhnout SRT</button>
+                <button id="clearTextField">Smazat textové pole</button>
+                <button id="clearTable">Smazat tabulku</button>
+                <button id="exportTable">Exportovat do textového pole</button>
+            </div>
+        </div>
+
+        <div class="subtitle-section">
+            <textarea id="subtitleEditor" placeholder="Vložte nebo napište vaše titulky ve formátu SRT..."></textarea>
+            <div class="subtitle-table-container">
+                <table class="subtitle-table">
+                    <thead>
+                        <tr>
+                            <th>Začátek</th>
+                            <th>Konec</th>
+                            <th>Text</th>
+                            <th>Akce</th>
+                        </tr>
+                    </thead>
+                    <tbody id="subtitleTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const videoUploader = document.getElementById('videoUploader');
+        const subtitleUploader = document.getElementById('subtitleUploader');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const addSubtitle = document.getElementById('addSubtitle');
+        const subtitleEditor = document.getElementById('subtitleEditor');
+        const subtitleTableBody = document.getElementById('subtitleTableBody');
+        const downloadSRT = document.getElementById('downloadSRT');
+        const importToTable = document.getElementById('importToTable');
+        const clearTextField = document.getElementById('clearTextField');
+        const clearTable = document.getElementById('clearTable');
+        const exportTable = document.getElementById('exportTable');
+
+        videoUploader.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const videoURL = URL.createObjectURL(file);
+                videoPlayer.src = videoURL;
+            }
+        });
+
+        subtitleUploader.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    subtitleEditor.value = e.target.result;
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        importToTable.addEventListener('click', () => {
+            const srtContent = subtitleEditor.value;
+            const srtLines = srtContent.split('\n');
+            let currentIndex = 0;
+
+            while (currentIndex < srtLines.length) {
+                const line = srtLines[currentIndex].trim();
+                if (line.match(/^\d+$/)) {
+                    const timeLine = srtLines[++currentIndex].trim();
+                    const [start, end] = timeLine.split(' --> ');
+                    const textLines = [];
+                    while (srtLines[++currentIndex] && srtLines[currentIndex].trim() !== '') {
+                        textLines.push(srtLines[currentIndex].trim());
+                    }
+
+                    const text = textLines.join(' ');
+
+                    const newRow = document.createElement('tr');
+                    newRow.innerHTML = `
+                        <td contenteditable="true">${start}</td>
+                        <td contenteditable="true">${end}</td>
+                        <td contenteditable="true">${text}</td>
+                        <td><button class="delete-btn">Smazat</button></td>
+                    `;
+
+                    subtitleTableBody.appendChild(newRow);
+                } else {
+                    currentIndex++;
+                }
+            }
+
+            attachDeleteEvents();
+        });
+
+        addSubtitle.addEventListener('click', () => {
+            const currentTime = videoPlayer.currentTime;
+            const minutes = Math.floor(currentTime / 60);
+            const seconds = Math.floor(currentTime % 60);
+            const milliseconds = Math.floor((currentTime % 1) * 1000);
+
+            const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')},${String(milliseconds).padStart(3, '0')}`;
+            const endTime = currentTime + 5;
+            const endMinutes = Math.floor(endTime / 60);
+            const endSeconds = Math.floor(endTime % 60);
+            const endMilliseconds = Math.floor((endTime % 1) * 1000);
+
+            const formattedEndTime = `${String(endMinutes).padStart(2, '0')}:${String(endSeconds).padStart(2, '0')},${String(endMilliseconds).padStart(3, '0')}`;
+
+            const newRow = document.createElement('tr');
+
+            newRow.innerHTML = `
+                <td contenteditable="true">${formattedTime}</td>
+                <td contenteditable="true">${formattedEndTime}</td>
+                <td contenteditable="true"></td>
+                <td><button class="delete-btn">Smazat</button></td>
+            `;
+
+            subtitleTableBody.appendChild(newRow);
+
+            attachDeleteEvents();
+        });
+
+        downloadSRT.addEventListener('click', () => {
+            let srtContent = '';
+            const rows = subtitleTableBody.querySelectorAll('tr');
+            rows.forEach((row, index) => {
+                const cells = row.querySelectorAll('td');
+                const start = cells[0].textContent.trim();
+                const end = cells[1].textContent.trim();
+                const text = cells[2].textContent.trim();
+                srtContent += `${index + 1}\n${start} --> ${end}\n${text}\n\n`;
+            });
+
+            const blob = new Blob([srtContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'subtitles.srt';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        clearTextField.addEventListener('click', () => {
+            subtitleEditor.value = '';
+        });
+
+        clearTable.addEventListener('click', () => {
+            subtitleTableBody.innerHTML = '';
+        });
+
+        exportTable.addEventListener('click', () => {
+            let srtContent = '';
+            const rows = subtitleTableBody.querySelectorAll('tr');
+            rows.forEach((row, index) => {
+                const cells = row.querySelectorAll('td');
+                const start = cells[0].textContent.trim();
+                const end = cells[1].textContent.trim();
+                const text = cells[2].textContent.trim();
+                srtContent += `${index + 1}\n${start} --> ${end}\n${text}\n\n`;
+            });
+            subtitleEditor.value = srtContent;
+        });
+
+        function attachDeleteEvents() {
+            const deleteButtons = document.querySelectorAll('.delete-btn');
+            deleteButtons.forEach(button => {
+                button.onclick = () => {
+                    button.closest('tr').remove();
+                };
+            });
+        }
+
+        attachDeleteEvents();
+    </script>
+    <script>
+        window.addEventListener('beforeunload', function (event) {
+        event.preventDefault();
+        event.returnValue = 'Opravdu chcete opustit tuto stránku?';
+        });
+    </script>
+</body>
+
+</html>
